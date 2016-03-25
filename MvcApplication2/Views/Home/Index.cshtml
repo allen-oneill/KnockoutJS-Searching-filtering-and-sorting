@@ -1,0 +1,178 @@
+﻿@{
+    ViewBag.Title = "Home Page";
+}
+
+<script src="~/Scripts/jquery-2.1.1.js"></script>
+<script src="~/Scripts/knockout-3.2.0.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/knockout.mapping/2.4.1/knockout.mapping.js"></script>
+
+        @section scripts {
+<script>    
+    var vm = null;
+
+    sortDirection = {
+        Asc:  0,
+        Desc: 1
+    }
+
+    var viewModel = function (data) {
+        if (data != null)
+            {
+            ko.mapping.fromJS(data, { Clients: clientMapping }, self);
+            }
+        var self = this;
+        self.Clients = ko.observableArray([]);
+
+        self.getClientsFromServer = function () {
+            $.ajax("/home/ClientAjaxLoader/", {
+                type: "GET",
+                cache: false,
+            }).done(function (jsondata) {
+                var jobj = $.parseJSON(jsondata);
+                ko.mapping.fromJS(jobj, { Clients: clientMapping }, self);
+                });
+        }        
+
+        self.search_ClientName = ko.observable('');  // required to trigger the search when changes occur
+        self.search_ClientAddress = ko.observable('');
+        self.search_ClientActive = ko.observable();
+        self.search_ClientStatus = ko.observable('');
+
+        self.isSortAsc = ko.observable(true);
+
+        self.filteredRecords = ko.computed(function () {            
+
+            return ko.utils.arrayFilter(self.Clients(), function (rec) {
+                return (
+                          (self.search_ClientName().length == 0 ||
+                                ko.utils.stringStartsWith(rec.ClientName().toLowerCase(), self.search_ClientName().toLowerCase()))
+                            &&
+                          (self.search_ClientAddress().length == 0 ||
+                                rec.Address().toLowerCase().indexOf(self.search_ClientAddress().toLowerCase()) > -1)
+                            &&
+                          (self.search_ClientActive() == null ||
+                                rec.Active() == self.search_ClientActive())
+                            &&
+                          (self.search_ClientStatus() == null ||
+                                rec.Status() >= self.search_ClientStatus())
+                            &&
+                          (self.isSortAsc() != null)
+                       )
+            }).sort(            
+               function (a, b) {
+                   if (self.isSortAsc() === true)
+                       {
+                       var x = a.SortCode().toLowerCase(), y = b.SortCode().toLowerCase();
+                       return x < y ? -1 : x > y ? 1 : 0;
+                       }
+                   else {
+                       var x = b.SortCode().toLowerCase(), y = a.SortCode().toLowerCase();
+                       return x < y ? -1 : x > y ? 1 : 0;
+                       }                  
+                    }
+                );
+        });
+
+    }
+
+    ko.utils.stringStartsWith = function (string, startsWith) {
+        string = string || "";
+        if (startsWith.length > string.length) return false;
+        return string.substring(0, startsWith.length) === startsWith;
+    };
+
+    var ClientDetail = function (data) {
+        var self = this;
+        if (data != null) {
+                self.ClientName = ko.observable(data.ClientName);
+                self.Address = ko.observable(data.Address);
+                self.Phone = ko.observable(data.Phone);
+                self.Active = ko.observable(data.Active);
+                self.Status = ko.observable(data.Status);
+                self.SortCode = ko.observable(data.SortCode);
+                }
+        }
+
+
+    var clientMapping = {
+        create: function (options) {
+            return new ClientDetail(options.data);
+        }
+    };
+
+    $(document).ready(function () {
+            vm = new viewModel();
+            ko.applyBindings(vm);
+
+            $(function () {
+                $('#showAll').click(function () {
+                    vm.search_ClientActive(null);
+                    vm.search_ClientStatus(null);
+                });
+                $('#showActive').click(function () {
+                    vm.search_ClientActive(true);
+                });
+                $('#showInActive').click(function () {
+                    vm.search_ClientActive(false);
+                });
+                $('#showStatus').click(function () {
+                    vm.search_ClientStatus(2); // set filter to show only status with value >= 2
+                });
+                $('#flipSortCode').click(function () {
+                    vm.isSortAsc(!vm.isSortAsc());
+                });
+            });
+
+
+        });
+
+
+</script>
+    }
+
+
+
+
+<hr />
+
+<h1>Client data loading example</h1>
+
+<a href="#" id="lnkGetData" data-bind="click: getClientsFromServer">Get clients from server</a>
+
+Filter: 
+<a href="#" id="showAll">Show all</a>
+<a href="#" id="showActive">Show only active</a> <br/>
+<a href="#" id="showInActive">Show only in-active</a>
+<a href="#" id="showStatus">Show status => 2</a><br/>
+<a href="#" id="flipSortCode">Flip sort code</a><br />
+
+<hr />
+Name <u>starts</u> with: <input data-bind="value: search_ClientName, valueUpdate: 'afterkeydown'" style="width:80px"/>
+Address <u>contains</u>: <input data-bind="value: search_ClientAddress, valueUpdate: 'afterkeydown'" style="width:80px" /> 
+
+<hr />
+
+<table border="1" cellpadding="10">
+    <thead>
+        <tr>
+            <th>Client name</th>
+            <th>Address</th>
+            <th>SortCode</th>
+            <th>Phone</th>
+            <th>Active</th>
+            <th>Status</th>
+        </tr>
+    </thead>
+    <tbody data-bind="foreach: filteredRecords">
+        <tr>
+            <td data-bind="text: ClientName"></td>
+            <td data-bind="text: Address"></td>
+            <td data-bind="text: SortCode"></td>
+            <td data-bind="text: Phone"></td>
+            <td data-bind="text: Active"></td>
+            <td data-bind="text: Status"></td>
+        </tr>
+    </tbody>
+</table>
+
+
